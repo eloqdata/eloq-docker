@@ -8,7 +8,7 @@ RUN echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
 
 # Development toolchain and libraries — everything here is installable via apt.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      jq sudo vim wget curl apt-utils \
+      jq sudo vim wget curl gnupg apt-transport-https apt-utils \
       python3 python3-dev python3-pip python3-venv \
       gdb lcov ccache rsync \
       build-essential gcc g++ make cmake ninja-build m4 bison pkg-config patchelf \
