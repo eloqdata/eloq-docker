@@ -32,6 +32,20 @@ RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
     && apt-get update && apt-get install -y --no-install-recommends google-cloud-cli \
     && rm -rf /var/lib/apt/lists/*
 
+# Python 3.8 + the log-replay test dependencies used by the eloqkv CI, baked
+# into a venv so the CI never has to apt-install python or pip-install at runtime.
+# Consumers activate it via $LOG_REPLAY_VENV/bin/activate.
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+      python3.8 python3.8-venv python3.8-dev \
+    && python3.8 -m venv /opt/eloq/log-replay-venv \
+    && /opt/eloq/log-replay-venv/bin/pip install --no-cache-dir \
+      async-timeout==4.0.3 psutil==5.9.5 redis==5.0.3 \
+    && chown -R root:sudo /opt/eloq && chmod -R g+rwX /opt/eloq \
+    && rm -rf /var/lib/apt/lists/*
+ENV LOG_REPLAY_VENV=/opt/eloq/log-replay-venv
+
 # Non-root user with passwordless sudo (no password is baked into the image).
 RUN useradd -rm -s /bin/bash -g sudo eloq \
     && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers \
