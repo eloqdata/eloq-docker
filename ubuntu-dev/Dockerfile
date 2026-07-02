@@ -46,6 +46,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends software-proper
     && rm -rf /var/lib/apt/lists/*
 ENV LOG_REPLAY_VENV=/opt/eloq/log-replay-venv
 
+# Python test/runtime tooling used by the eloqkv CI (formerly installed by
+# scripts/dep/ubuntu/02-python.sh): awscli, boto3, cassandra-driver, grpcio,
+# etc. Baked into a venv so the build/test scripts never pip-install at runtime.
+# Consumers activate it via $ELOQ_TEST_VENV/bin/activate.
+RUN python3 -m venv /opt/eloq/test-venv \
+    && /opt/eloq/test-venv/bin/pip install --no-cache-dir \
+      setuptools==45.2.0 \
+      cassandra-driver==3.29.2 \
+      awscli==1.29.44 \
+      boto3==1.28.36 \
+      botocore==1.31.44 \
+      mysql-connector-python==8.1.0 \
+      psutil==5.9.5 \
+      grpcio==1.60.0 \
+      grpcio-tools==1.60.0 \
+    && chown -R root:sudo /opt/eloq && chmod -R g+rwX /opt/eloq
+ENV ELOQ_TEST_VENV=/opt/eloq/test-venv
+
 # Non-root user with passwordless sudo (no password is baked into the image).
 RUN useradd -rm -s /bin/bash -g sudo eloq \
     && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers \
