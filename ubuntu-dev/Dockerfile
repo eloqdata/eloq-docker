@@ -4,11 +4,30 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHON2_HOME=/opt/eloq/python2
 ENV PATH=$PYTHON2_HOME/bin:/home/eloq/.local/bin:$PATH
 
-# Force IPv4 for apt to avoid flaky IPv6 mirrors.
-RUN echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+# Force IPv4 for apt to avoid flaky IPv6 mirrors, and retry transient mirror
+# sync failures seen on Ubuntu ports.
+RUN echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4 \
+    && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
+    && printf '%s\n' \
+      '#!/bin/sh' \
+      'set -eu' \
+      'status=1' \
+      'for attempt in 1 2 3 4 5; do' \
+      '  rm -rf /var/lib/apt/lists/*' \
+      '  apt-get update' \
+      '  if apt-get install -y --no-install-recommends "$@"; then' \
+      '    exit 0' \
+      '  fi' \
+      '  status=$?' \
+      '  echo "apt install failed on attempt ${attempt}; retrying..." >&2' \
+      '  sleep $((attempt * 10))' \
+      'done' \
+      'exit "$status"' \
+      > /usr/local/bin/apt-install-retry \
+    && chmod +x /usr/local/bin/apt-install-retry
 
 # Development toolchain and libraries — everything here is installable via apt.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-install-retry \
       jq sudo vim wget curl gnupg apt-transport-https apt-utils \
       python3 python3-dev python3-pip python3-venv \
       gdb lcov ccache rsync \
@@ -30,15 +49,15 @@ RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
       | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
       > /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && apt-get update && apt-get install -y --no-install-recommends google-cloud-cli \
+    && apt-install-retry google-cloud-cli \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 3.8 + the log-replay test dependencies used by the eloqkv CI, baked
 # into a venv so the CI never has to apt-install python or pip-install at runtime.
 # Consumers activate it via $LOG_REPLAY_VENV/bin/activate.
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+RUN apt-install-retry software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y --no-install-recommends \
+    && apt-install-retry \
       python3.8 python3.8-venv python3.8-dev \
     && python3.8 -m venv /opt/eloq/log-replay-venv \
     && /opt/eloq/log-replay-venv/bin/pip install --no-cache-dir \
@@ -69,6 +88,10 @@ ENV ELOQ_TEST_VENV=/opt/eloq/test-venv
 # Python 2 cannot reliably build against Ubuntu 24.04's OpenSSL 3, so build a
 # private OpenSSL 1.1 runtime for the Python 2 ssl module.
 RUN set -eux; \
+    apt-install-retry \
+      build-essential ca-certificates curl libbz2-dev libffi-dev liblzma-dev \
+      libncursesw5-dev libreadline-dev libsqlite3-dev libssl-dev make tk-dev \
+      wget xz-utils zlib1g-dev; \
     mkdir -p /tmp/python2-build; \
     cd /tmp/python2-build; \
     curl -fsSLO https://www.openssl.org/source/openssl-1.1.1w.tar.gz; \
