@@ -8,8 +8,8 @@ Docker images for EloqData development.
 
 A lightweight Ubuntu 24.04 development image containing the build toolchain and libraries that
 EloqData projects need, installed entirely via `apt` (compilers, CMake/Ninja, common C/C++ dev
-libraries, Python 3, Node.js, Go, the JDK, and the Google Cloud CLI). It runs as a non-root user
-`eloq` with passwordless `sudo`.
+libraries, Python 3, Python 2.7 for legacy MongoDB 4.0 build tooling, Node.js, Go, the JDK, and
+the Google Cloud CLI). It runs as a non-root user `eloq` with passwordless `sudo`.
 
 Pull it (Docker automatically selects `amd64` or `arm64` for your machine):
 

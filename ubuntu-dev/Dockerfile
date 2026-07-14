@@ -1,7 +1,8 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PATH=/home/eloq/.local/bin:$PATH
+ENV PYTHON2_HOME=/opt/eloq/python2
+ENV PATH=$PYTHON2_HOME/bin:/home/eloq/.local/bin:$PATH
 
 # Force IPv4 for apt to avoid flaky IPv6 mirrors.
 RUN echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
@@ -63,6 +64,53 @@ RUN python3 -m venv /opt/eloq/test-venv \
       grpcio-tools==1.60.0 \
     && chown -R root:sudo /opt/eloq && chmod -R g+rwX /opt/eloq
 ENV ELOQ_TEST_VENV=/opt/eloq/test-venv
+
+# Python 2.7.18 + the MongoDB 4.0 build/resmoke dependencies used by EloqDoc.
+# Python 2 cannot reliably build against Ubuntu 24.04's OpenSSL 3, so build a
+# private OpenSSL 1.1 runtime for the Python 2 ssl module.
+RUN set -eux; \
+    mkdir -p /tmp/python2-build; \
+    cd /tmp/python2-build; \
+    curl -fsSLO https://www.openssl.org/source/openssl-1.1.1w.tar.gz; \
+    tar -xzf openssl-1.1.1w.tar.gz; \
+    cd openssl-1.1.1w; \
+    ./config --prefix=/opt/eloq/openssl-1.1 --openssldir=/opt/eloq/openssl-1.1 shared zlib; \
+    make -j"$(nproc)"; \
+    make install_sw; \
+    cd /tmp/python2-build; \
+    curl -fsSLO https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz; \
+    tar -xzf Python-2.7.18.tgz; \
+    cd Python-2.7.18; \
+    ./configure \
+      --prefix="$PYTHON2_HOME" \
+      --enable-shared \
+      --enable-unicode=ucs4 \
+      --with-system-ffi \
+      CPPFLAGS="-I/opt/eloq/openssl-1.1/include" \
+      LDFLAGS="-Wl,-rpath,/opt/eloq/openssl-1.1/lib -L/opt/eloq/openssl-1.1/lib"; \
+    make -j"$(nproc)"; \
+    make install; \
+    echo "$PYTHON2_HOME/lib" > /etc/ld.so.conf.d/python2.conf; \
+    echo "/opt/eloq/openssl-1.1/lib" > /etc/ld.so.conf.d/openssl-1.1.conf; \
+    ldconfig; \
+    curl -fsSL https://bootstrap.pypa.io/pip/2.7/get-pip.py -o /tmp/get-pip.py; \
+    python2 /tmp/get-pip.py 'pip<21' 'setuptools<45' 'wheel<0.38'; \
+    python2 -m pip install --no-cache-dir \
+      'Cheetah3==3.0.0' \
+      'Jinja2==2.10' \
+      'MarkupSafe<2.0' \
+      'PyYAML==3.11' \
+      'mock==2.0.0' \
+      'pymongo>=3.0,<4' \
+      'regex==2021.11.10' \
+      'requests>=2.16.1,<2.28' \
+      'subprocess32>=3.2.7' \
+      'typing==3.6.1' \
+      'unittest-xml-reporting==2.1.0'; \
+    ln -sf "$PYTHON2_HOME/bin/python2.7" /usr/local/bin/python2; \
+    ln -sf "$PYTHON2_HOME/bin/pip2.7" /usr/local/bin/pip2; \
+    chown -R root:sudo /opt/eloq && chmod -R g+rwX /opt/eloq; \
+    rm -rf /tmp/python2-build /tmp/get-pip.py /root/.cache
 
 # Non-root user with passwordless sudo (no password is baked into the image).
 RUN useradd -rm -s /bin/bash -g sudo eloq \
