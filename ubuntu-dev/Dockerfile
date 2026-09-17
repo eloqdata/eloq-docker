@@ -112,6 +112,28 @@ RUN set -eux; \
     chown -R root:sudo /opt/eloq && chmod -R g+rwX /opt/eloq; \
     rm -rf /tmp/python2-build /tmp/get-pip.py /root/.cache
 
+# RustFS is shared by EloqDoc and EloqKV CI; fetch it once per image build.
+# Pin both release archives so a changed upstream asset fails the build.
+COPY licenses/rustfs-1.0.0.LICENSE /usr/local/share/licenses/rustfs/LICENSE
+ARG TARGETARCH
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64) rustfs_arch=x86_64; rustfs_sha256=2d5059501745682664c3d345b22274b66079c952fbec7e1ce66980ef4515cd42 ;; \
+      arm64) rustfs_arch=aarch64; rustfs_sha256=780e832d68e0148dc042f05647796056fe014e7cf1a8f195e3e83b22a3bb988f ;; \
+      *) echo "Unsupported RustFS architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    rustfs_version=1.0.0; \
+    rustfs_archive="rustfs-linux-${rustfs_arch}-gnu-v${rustfs_version}.zip"; \
+    mkdir -p /tmp/rustfs-install; \
+    curl --fail --show-error --location --retry 3 --connect-timeout 15 --max-time 300 \
+      "https://github.com/rustfs/rustfs/releases/download/${rustfs_version}/${rustfs_archive}" \
+      --output "/tmp/rustfs-install/${rustfs_archive}"; \
+    echo "${rustfs_sha256}  /tmp/rustfs-install/${rustfs_archive}" | sha256sum --check --strict; \
+    unzip -q "/tmp/rustfs-install/${rustfs_archive}" rustfs -d /tmp/rustfs-install; \
+    install -m 0755 /tmp/rustfs-install/rustfs /usr/local/bin/rustfs; \
+    rustfs --version; \
+    rm -rf /tmp/rustfs-install
+
 # Non-root user with passwordless sudo (no password is baked into the image).
 RUN useradd -rm -s /bin/bash -g sudo eloq \
     && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers \

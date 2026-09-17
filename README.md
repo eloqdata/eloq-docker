@@ -6,10 +6,18 @@ Docker images for EloqData development.
 
 ### `eloqdata/ubuntu-dev`
 
-A lightweight Ubuntu 24.04 development image containing the build toolchain and libraries that
-EloqData projects need, installed entirely via `apt` (compilers, CMake/Ninja, common C/C++ dev
-libraries, Python 3, Python 2.7 for legacy MongoDB 4.0 build tooling, Node.js, Go, the JDK, and
-the Google Cloud CLI). It runs as a non-root user `eloq` with passwordless `sudo`.
+An Ubuntu 24.04 development image containing the build toolchain and libraries that
+EloqData projects need: compilers, CMake/Ninja, common C/C++ dev libraries, Python 3,
+Python 2.7 for legacy MongoDB 4.0 build tooling, Node.js, Go, the JDK, and the Google Cloud CLI.
+It also includes the Python test environments and RustFS 1.0.0 for local S3 tests.
+It runs as a non-root user `eloq` with passwordless `sudo`.
+
+RustFS is installed at `/usr/local/bin/rustfs` from the upstream amd64/arm64 release
+archives, with pinned SHA256 checksums. Consumers can start `rustfs server <data-dir>`
+without downloading or extracting it during tests; the image does not start a server
+automatically or include credentials. Its Apache-2.0 license is included at
+`/usr/local/share/licenses/rustfs/LICENSE`; the source is
+[RustFS 1.0.0](https://github.com/rustfs/rustfs/tree/1.0.0).
 
 Pull it (Docker automatically selects `amd64` or `arm64` for your machine):
 
