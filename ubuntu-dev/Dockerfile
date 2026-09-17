@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libuv1-dev libgflags-dev libleveldb-dev libsnappy-dev libjsoncpp-dev \
       libboost-context-dev libboost-stacktrace-dev \
       libc-ares-dev libc-ares2 libsqlite3-dev libffi-dev \
-      ca-certificates tar redis tcl \
+      ca-certificates tar unzip redis tcl \
     && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud CLI (installed from Google's apt repository).
